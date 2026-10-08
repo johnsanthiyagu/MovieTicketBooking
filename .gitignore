@@ -1,0 +1,5 @@
+Backend/.env
+Backend/node_modules/
+Frontend/my-react-app/.env
+Frontend/my-react-app/node_modules/
+Frontend/my-react-app/dist/
