@@ -88,4 +88,6 @@ Protected endpoints expect `Authorization: Bearer <token>`.
 
 ## Production considerations
 
+When deploying the backend to Vercel, configure `CONNECTION_STRING` (or `MONGO_URI`) as a project environment variable using the production MongoDB connection URI. The API connects on demand and reuses the connection for subsequent requests in the same function instance. Ensure the MongoDB deployment allows connections from your Vercel deployment.
+
 The included payment flow is intentionally a demo, not a payment gateway integration. A production launch needs a provider such as Stripe or Razorpay, server-side payment-intent verification and webhook handling, and idempotent refund handling before marking payments as settled. Configure production secrets, HTTPS, email delivery, rate limits, monitoring, MongoDB backups, and privacy/retention policies before deployment. The frontend uses external Google Fonts and image URLs for the visual demo.

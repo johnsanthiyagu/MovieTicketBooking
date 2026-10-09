@@ -15,6 +15,15 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '100kb' }));
 
+app.use(async (_req, _res, next) => {
+  try {
+    await connectDB();
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.get('/api/health', (_req, res) => {
   res.status(mongoose.connection.readyState === 1 ? 200 : 503).json({
     status: mongoose.connection.readyState === 1 ? 'ok' : 'database_disconnected',
