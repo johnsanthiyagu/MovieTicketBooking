@@ -1,10 +1,11 @@
 const router = require('express').Router();
 const controller = require('../controllers/bookingController');
-const { protect } = require('../middleware/auth');
+const { protect, allowRoles } = require('../middleware/auth');
 
 router.use(protect);
-router.post('/', controller.book);
-router.get('/mine', controller.mine);
-router.patch('/:id/cancel', controller.cancel);
+router.post('/razorpay/order', allowRoles('user'), controller.createOrder);
+router.post('/razorpay/verify', allowRoles('user'), controller.verifyPayment);
+router.get('/mine', allowRoles('user'), controller.mine);
+router.patch('/:id/cancel', allowRoles('user'), controller.cancel);
 
 module.exports = router;

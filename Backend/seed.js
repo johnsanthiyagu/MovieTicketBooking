@@ -99,6 +99,7 @@ const seed = async () => {
         owner: users[index + 1]._id,
         seatCount: 200,
         facilities: ['Dolby Atmos', 'Laser Projection', 'Parking', 'Premium Lounge'],
+        approvalStatus: 'approved',
         active: true
       });
       await theater.save();

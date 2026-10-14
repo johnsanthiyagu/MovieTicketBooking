@@ -27,15 +27,21 @@ exports.register = async (req, res, next) => {
     } catch (error) {
       return res.status(503).json({ message: error.message });
     }
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, role = 'user', adminRegistrationCode } = req.body;
     if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' ||
       typeof password !== 'string' || password.length < 8) {
       return res.status(400).json({ message: 'Name, email, and a password of at least 8 characters are required.' });
     }
+    if (!['user', 'theaterOwner', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Choose a valid account type.' });
+    }
+    if (role === 'admin' && (!process.env.ADMIN_REGISTRATION_CODE || adminRegistrationCode !== process.env.ADMIN_REGISTRATION_CODE)) {
+      return res.status(403).json({ message: 'Admin registration requires a valid administrator invitation code.' });
+    }
     if (await User.exists({ email: email.toLowerCase().trim() })) {
       return res.status(409).json({ message: 'An account with that email already exists.' });
     }
-    const user = await User.create({ name, email, password, phone });
+    const user = await User.create({ name, email, password, phone, role });
     return res.status(201).json({ token: issueToken(user), user: publicUser(user) });
   } catch (error) {
     return next(error);
@@ -49,13 +55,16 @@ exports.login = async (req, res, next) => {
     } catch (error) {
       return res.status(503).json({ message: error.message });
     }
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
     if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ message: 'Email or password is incorrect.' });
+    }
+    if (role && user.role !== role) {
+      return res.status(401).json({ message: 'This account does not match the selected account type.' });
     }
     return res.json({ token: issueToken(user), user: publicUser(user) });
   } catch (error) {

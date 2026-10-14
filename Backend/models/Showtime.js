@@ -7,7 +7,10 @@ const seatSchema = new mongoose.Schema(
     number: { type: Number, required: true },
     type: { type: String, enum: ['standard', 'premium'], default: 'standard' },
     price: { type: Number, required: true, min: 0 },
-    status: { type: String, enum: ['available', 'booked'], default: 'available' }
+    status: { type: String, enum: ['available', 'booked', 'reserved'], default: 'available' },
+    reservationId: { type: String, default: undefined },
+    reservedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: undefined },
+    reservedUntil: { type: Date, default: undefined }
   },
   { _id: false }
 );

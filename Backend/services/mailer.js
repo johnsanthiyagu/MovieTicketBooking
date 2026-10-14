@@ -6,7 +6,8 @@ const paymentMethodLabels = {
   qr: 'QR code',
   card: 'Credit/debit card',
   netbanking: 'Net banking',
-  wallet: 'Digital wallet'
+  wallet: 'Digital wallet',
+  razorpay: 'Razorpay test mode'
 };
 
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
@@ -67,6 +68,9 @@ const sendBookingEmail = async (transaction, user, movie, theater, showtime) => 
   }
 
   const transporter = createTransporter();
+  const paymentNotice = transaction.paymentMode === 'razorpay'
+    ? 'Payment completed using Razorpay test mode. No live funds were collected.'
+    : `Your booking used a simulated ${paymentMethodLabels[transaction.paymentMethod] || 'demo'} payment. No money was collected.`;
   const details = [
     ['Film', movie.title],
     ['Cinema', `${theater.name}, ${theater.city}`],
@@ -87,7 +91,7 @@ const sendBookingEmail = async (transaction, user, movie, theater, showtime) => 
     text: [
       `Hi ${user.name},`,
       '',
-      `Your booking is confirmed with a simulated ${paymentMethodLabels[transaction.paymentMethod] || 'demo'} payment. No money was collected.`,
+      paymentNotice,
       ...details.map(([label, value]) => `${label}: ${value}`),
       `Booking code: ${transaction.bookingCode}`,
       '',
@@ -107,7 +111,7 @@ const sendBookingEmail = async (transaction, user, movie, theater, showtime) => 
               <p style="margin:0 0 7px;color:#aaa69b;font-size:10px;letter-spacing:2px">BOOKING CODE</p>
               <p style="margin:0;color:#d6b879;font-family:monospace;font-size:22px;letter-spacing:2px">${escapeHtml(transaction.bookingCode)}</p>
             </div>
-            <p style="margin:18px 0 0;padding:12px;color:#e2c991;background:#262217;font-size:12px;line-height:1.6"><strong>DEMO PAYMENT</strong><br>This payment was simulated using ${escapeHtml(paymentMethodLabels[transaction.paymentMethod] || 'Demo')}. No money was collected.</p>
+            <p style="margin:18px 0 0;padding:12px;color:#e2c991;background:#262217;font-size:12px;line-height:1.6"><strong>${transaction.paymentMode === 'razorpay' ? 'RAZORPAY TEST PAYMENT' : 'DEMO PAYMENT'}</strong><br>${escapeHtml(paymentNotice)}</p>
           </div>
           <div style="padding:16px 30px;border-top:1px solid #39382f;color:#898579;font-size:11px">This is your digital ticket confirmation. Enjoy the show.</div>
         </div>

@@ -12,10 +12,11 @@ const transactionSchema = new mongoose.Schema(
     currency: { type: String, default: 'INR' },
     paymentMethod: {
       type: String,
-      enum: ['demo', 'upi', 'qr', 'card', 'netbanking', 'wallet'],
-      default: 'demo'
+      enum: ['demo', 'upi', 'qr', 'card', 'netbanking', 'wallet', 'razorpay'],
+      default: 'razorpay'
     },
-    paymentMode: { type: String, enum: ['demo'], default: 'demo' },
+    paymentMode: { type: String, enum: ['demo', 'razorpay'], default: 'razorpay' },
+    paymentId: { type: String, unique: true, sparse: true },
     paymentStatus: { type: String, enum: ['succeeded', 'refunded'], default: 'succeeded' },
     status: { type: String, enum: ['confirmed', 'cancelled'], default: 'confirmed' }
   },

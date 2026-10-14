@@ -11,6 +11,10 @@
 .brand-name small { display: block; margin-top: 6px; font: 600 8px/1 'DM Sans', sans-serif; letter-spacing: .23em; color: #8f8a7e; }
 .nav-links { display: flex; align-items: center; gap: 34px; color: #c2beb4; font-size: 12px; letter-spacing: .04em; }
 .nav-links a:not(.nav-signin):hover { color: var(--gold); }
+.nav-user { display: flex; flex-direction: column; gap: 3px; max-width: 220px; line-height: 1.2; }
+.nav-user strong { overflow: hidden; color: #eee9df; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.nav-user span { overflow-wrap: anywhere; color: #a9a59a; font-size: 10px; letter-spacing: 0; }
+.nav-user small { color: var(--gold); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
 .nav-signin, .nav-account { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(214,184,121,.5); padding: 11px 15px; color: var(--gold); background: transparent; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; cursor: pointer; transition: .2s ease; }
 .nav-signin:hover, .nav-account:hover { background: var(--gold); color: #171714; }
 .mobile-menu { display: none !important; }
@@ -174,6 +178,12 @@
 .theater-card-foot > span { display: flex; align-items: center; gap: 5px; }
 .text-link { display: inline-flex; align-items: center; gap: 5px; padding: 3px 0; border: 0; color: var(--gold); background: transparent; font-size: 9px; cursor: pointer; }
 .text-link:hover { color: var(--gold-bright); }
+.theater-detail-intro > p:not(.eyebrow) { display: flex; align-items: center; gap: 6px; }
+.theater-detail-intro > p svg { color: var(--gold); }
+.theater-schedule-section { margin: 10px 0 30px; }
+.theater-schedule-section .section-heading { margin-bottom: 8px; }
+.theater-detail-show .theater-monogram { overflow: hidden; }
+.theater-detail-show .theater-monogram img { width: 100%; height: 100%; object-fit: cover; }
 
 .seat-page { max-width: 1120px; }
 .seat-page-title { display: flex; justify-content: space-between; align-items: flex-end; margin: 13px 0 25px; }
@@ -267,6 +277,12 @@
 .auth-role-note, .auth-reset-notice { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; border: 1px solid rgba(214,184,121,.2); color: #c4b99d; background: rgba(214,184,121,.06); font-size: 9px; line-height: 1.6; }
 .auth-role-note { margin: -10px 0 18px; }
 .auth-role-note svg, .auth-reset-notice svg { flex: 0 0 auto; margin-top: 1px; color: var(--gold); }
+.account-role-picker { min-width: 0; margin: 0 0 17px; padding: 0; border: 0; }
+.account-role-picker legend { margin-bottom: 8px; color: #c0bbae; font-size: 9px; font-weight: 500; }
+.account-role-picker > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.account-role-picker label { display: flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 8px; border: 1px solid var(--line); color: #a9a497; background: #191a17; font-size: 9px; cursor: pointer; }
+.account-role-picker label.account-role-selected { border-color: rgba(214,184,121,.65); color: #e8d8b2; background: rgba(214,184,121,.07); }
+.account-role-picker input { width: 13px; height: 13px; margin: 0; accent-color: var(--gold); }
 .auth-reset-notice { margin: 10px 0; border-color: rgba(145,177,139,.25); color: #b5c9ad; background: rgba(114,148,107,.08); }
 .auth-forgot { margin: 11px 0 0; text-align: right; }
 .auth-forgot button { padding: 0; border: 0; color: #c4b99d; background: transparent; font-size: 9px; cursor: pointer; }
@@ -341,6 +357,14 @@
 .panel-title h2 { margin: 0; color: #ede8de; font: 500 19px 'Playfair Display', serif; }
 .manage-form .form-label { margin: 11px 0; }
 .manage-form .button { margin-top: 5px; }
+.theater-approval-panel { margin: 14px 0; }
+.theater-request-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 75px auto; }
+.owner-theater-status { margin-top: 16px; border-top: 1px solid var(--line); }
+.owner-theater-status > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.owner-theater-status strong { overflow: hidden; color: #e2ddd3; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.approval-status { padding: 5px 7px; color: #b5c9ad; background: rgba(114,148,107,.1); font-size: 8px; text-transform: capitalize; }
+.approval-status.status-pending { color: #d6be87; background: rgba(214,184,121,.1); }
+.approval-status.status-rejected { color: #dfa59a; background: rgba(198,105,89,.1); }
 .manage-form-row { display: grid; grid-template-columns: 1.2fr .8fr; gap: 10px; }
 .omdb-search { display: flex; gap: 7px; margin: 16px 0; }
 .omdb-search input { flex: 1; min-width: 0; padding: 0 11px; border: 1px solid var(--line); outline: 0; color: var(--text); background: #20211d; font-size: 10px; }
@@ -407,6 +431,7 @@
   .booking-card { grid-template-columns: 60px minmax(150px, 1.6fr) minmax(90px, .7fr) minmax(100px, .6fr); gap: 12px; }
   .booking-poster { width: 52px; height: 70px; }
   .schedule-row { grid-template-columns: 75px minmax(130px,1fr) 60px 75px 112px; gap: 8px; }
+  .theater-request-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 60px auto; }
   .schedule-price { grid-column: 3; grid-row: 1; }
 }
 @media (max-width: 620px) {
@@ -418,6 +443,7 @@
   .nav-links { position: absolute; top: 100%; right: 0; left: 0; display: none; flex-direction: column; align-items: stretch; gap: 0; padding: 8px 17px 15px; border-bottom: 1px solid var(--line); background: #171815; }
   .nav-links.nav-open { display: flex; }
   .nav-links > a:not(.nav-signin) { padding: 13px 4px; border-bottom: 1px solid var(--line); }
+  .nav-user { max-width: none; padding: 14px 4px; border-bottom: 1px solid var(--line); }
   .nav-signin, .nav-account { justify-content: center; margin-top: 11px; }
   .hero { min-height: 560px; height: 78vh; max-height: 700px; }
   .hero-backdrop { background-position: 60% center; }
@@ -469,6 +495,8 @@
   .date-control input, .city-control select { width: 125px; font-size: 9px; }
   .city-control select { min-width: 92px; width: auto; }
   .theater-show-card { grid-template-columns: 1fr auto; gap: 10px; padding: 15px 0; }
+  .theater-request-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .theater-request-row .schedule-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .theater-show-info { grid-column: 1 / -1; }
   .show-time-price { grid-column: 1; grid-row: 2; }
   .show-book-button { grid-column: 2; grid-row: 2; }

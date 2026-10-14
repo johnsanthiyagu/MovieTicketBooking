@@ -8,7 +8,8 @@ const theaterSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     seatCount: { type: Number, default: 200, min: 1 },
     facilities: { type: [String], default: ['Dolby Atmos', 'Parking', 'Snacks'] },
-    active: { type: Boolean, default: true }
+    approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved', index: true },
+    active: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

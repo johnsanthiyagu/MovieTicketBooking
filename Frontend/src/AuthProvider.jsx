@@ -20,12 +20,12 @@ export function AuthProvider({ children }) {
     setUser(data.user)
     return data.user
   }
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password })
+  const login = async (email, password, role) => {
+    const { data } = await api.post('/auth/login', { email, password, role })
     return establishSession(data)
   }
-  const register = async (name, email, password) => {
-    const { data } = await api.post('/auth/register', { name, email, password })
+  const register = async (name, email, password, role, adminRegistrationCode) => {
+    const { data } = await api.post('/auth/register', { name, email, password, role, adminRegistrationCode })
     return establishSession(data)
   }
   const logout = () => {

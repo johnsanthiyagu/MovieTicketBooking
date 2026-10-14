@@ -3,8 +3,8 @@ import {
   ArrowRight, Armchair, BarChart3, CalendarDays, Check, ChevronDown,
   ChevronLeft, Film, Heart, KeyRound, LoaderCircle, LogIn, LogOut, Mail,
   MailCheck, MailWarning,
-  CreditCard, Landmark, MapPin, Menu, Plus, Popcorn, Printer, QrCode, Search,
-  ShieldCheck, Smartphone, Sparkles, Star, Ticket, TicketCheck, Wallet, X
+  CreditCard, MapPin, Menu, Plus, Popcorn, Printer, Search, ShieldCheck,
+  Sparkles, Star, Ticket, TicketCheck, X
 } from 'lucide-react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from './api'
@@ -29,14 +29,17 @@ const currency = (amount) => new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 }).format(amount || 0)
 
-const paymentMethods = [
-  { value: 'upi', label: 'UPI', detail: 'Any UPI app · simulated', Icon: Smartphone },
-  { value: 'qr', label: 'QR code', detail: 'Scan to pay · simulated', Icon: QrCode },
-  { value: 'card', label: 'Credit / debit card', detail: 'Cards · simulated', Icon: CreditCard },
-  { value: 'netbanking', label: 'Net banking', detail: 'Bank transfer · simulated', Icon: Landmark },
-  { value: 'wallet', label: 'Digital wallet', detail: 'Wallet · simulated', Icon: Wallet },
-]
-const paymentMethodLabel = (value) => paymentMethods.find((method) => method.value === value)?.label || 'Demo'
+const paymentMethodLabel = (value) => value === 'razorpay' ? 'Razorpay test mode' : value || 'Demo'
+const isApprovedTheater = (theater) => theater.approvalStatus === 'approved' || !theater.approvalStatus
+
+const loadRazorpayCheckout = () => new Promise((resolve) => {
+  if (window.Razorpay) return resolve(true)
+  const script = document.createElement('script')
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+  script.onload = () => resolve(true)
+  script.onerror = () => resolve(false)
+  document.body.appendChild(script)
+})
 
 const dateInputValue = (date) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
@@ -63,6 +66,7 @@ function Navigation() {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
+  const accountType = user?.role === 'admin' ? 'Admin' : user?.role === 'theaterOwner' ? 'Theatre owner' : 'User'
   return (
     <header className="site-header">
       <div className="topline"><Sparkles size={13} /> A better night out starts here <span>·</span> Book in a few taps</div>
@@ -77,10 +81,17 @@ function Navigation() {
         <div className={`nav-links ${open ? 'nav-open' : ''}`}>
           <Link to="/" onClick={close}>Explore</Link>
           <Link to="/theaters" onClick={close}>Theatres</Link>
-          {user && <Link to="/bookings" onClick={close}>My tickets</Link>}
+          {user && user.role !== 'admin' && user.role !== 'theaterOwner' && <Link to="/bookings" onClick={close}>My tickets</Link>}
           {(user?.role === 'admin' || user?.role === 'theaterOwner') && <Link to="/manage" onClick={close}>Manage</Link>}
           {user ? (
-            <button className="nav-account" onClick={() => { logout(); close() }}><LogOut size={15} /> Sign out</button>
+            <>
+              <div className="nav-user" aria-label={`Signed in as ${user.name}, ${user.email}, ${accountType}`}>
+                <strong>{user.name}</strong>
+                <span>{user.email}</span>
+                <small>{accountType} account</small>
+              </div>
+              <button className="nav-account" onClick={() => { logout(); close() }}><LogOut size={15} /> Sign out</button>
+            </>
           ) : (
             <Link className="nav-signin" to="/login" onClick={close}><LogIn size={15} /> Sign in</Link>
           )}
@@ -236,6 +247,7 @@ function HomePage() {
 
 function ShowtimesPage() {
   const { movieId } = useParams()
+  const { user } = useAuth()
   const [movie, setMovie] = useState(null)
   const [showtimes, setShowtimes] = useState([])
   const [date, setDate] = useState(() => {
@@ -289,7 +301,7 @@ function ShowtimesPage() {
               <div className="theater-show-info"><span className="theater-monogram"><Film size={19} /></span><div><h3>{show.theater.name}</h3><p><MapPin size={13} /> {show.theater.city} · {show.theater.address}</p></div></div>
               <div className="theater-show-tags"><span>{show.format}</span><span><Armchair size={13} /> {show.availableSeats} seats</span></div>
               <div className="show-time-price"><strong>{displayTime(show.startsAt)}</strong><span>from {currency(show.basePrice)}</span></div>
-              <Link className="button button-gold show-book-button" to={`/seats/${show._id}`}>Select seats <ArrowRight size={15} /></Link>
+              {user?.role !== 'admin' && user?.role !== 'theaterOwner' && <Link className="button button-gold show-book-button" to={`/seats/${show._id}`}>Select seats <ArrowRight size={15} /></Link>}
             </article>
           ))}</div>
             : <div className="empty-state empty-large"><CalendarDays size={25} /><h3>No showtimes yet</h3><p>There are no listings for {displayDate(`${date}T00:00:00`)}. Try another date or city.</p></div>}
@@ -306,16 +318,17 @@ function SeatPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('upi')
+  const isStaff = user?.role === 'admin' || user?.role === 'theaterOwner'
 
   useEffect(() => {
+    if (isStaff) return
     let active = true
     api.get(`/theaters/showtimes/${showtimeId}`)
       .then(({ data }) => { if (active) setShowtime(data.showtime) })
       .catch((requestError) => { if (active) setError(requestError.response?.data?.message || 'Could not load this seat map.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [showtimeId])
+  }, [showtimeId, isStaff])
 
   const seatRows = useMemo(() => {
     if (!showtime) return []
@@ -343,20 +356,45 @@ function SeatPage() {
     setSubmitting(true)
     setError('')
     try {
-      const { data } = await api.post('/bookings', { showtimeId, seats: selected, paymentMethod })
-      navigate('/bookings', { state: { booking: data.transaction, emailSent: data.emailSent, message: data.message } })
+      const { data: orderData } = await api.post('/bookings/razorpay/order', { showtimeId, seats: selected })
+      if (!await loadRazorpayCheckout()) throw new Error('Razorpay Checkout could not be loaded. Check your connection and try again.')
+      const checkout = new window.Razorpay({
+        key: orderData.keyId,
+        amount: orderData.order.amount,
+        currency: orderData.order.currency,
+        name: 'Lumière',
+        description: `${selected.length} ticket${selected.length === 1 ? '' : 's'} · ${showtime.movie.title}`,
+        order_id: orderData.order.id,
+        prefill: { name: user.name, email: user.email },
+        theme: { color: '#d6b879' },
+        handler: async (paymentResponse) => {
+          try {
+            const { data } = await api.post('/bookings/razorpay/verify', paymentResponse)
+            navigate('/bookings', { state: { booking: data.transaction, emailSent: data.emailSent, message: data.message } })
+          } catch (requestError) {
+            setError(requestError.response?.data?.message || 'Payment verification failed. Contact support with your Razorpay payment ID.')
+            setSubmitting(false)
+          }
+        },
+        modal: { ondismiss: () => setSubmitting(false) },
+      })
+      checkout.on('payment.failed', (event) => {
+        setError(event.error?.description || 'Razorpay payment failed. Your seats will be released shortly.')
+        setSubmitting(false)
+      })
+      checkout.open()
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Booking could not be completed. Please try again.')
+      setError(requestError.response?.data?.message || requestError.message || 'Booking could not be completed. Please try again.')
+      setSubmitting(false)
       if (requestError.response?.status === 409) {
         const { data } = await api.get(`/theaters/showtimes/${showtimeId}`)
         setShowtime(data.showtime)
         setSelected([])
       }
-    } finally {
-      setSubmitting(false)
     }
   }
 
+  if (isStaff) return <Navigate to="/manage" replace />
   if (loading) return <main className="page-shell container"><div className="loading-state"><LoaderCircle className="spin" /> Preparing the seating plan...</div></main>
   if (!showtime) return <main className="page-shell container"><div className="inline-error">{error || 'This showtime is no longer available.'}</div></main>
 
@@ -372,9 +410,9 @@ function SeatPage() {
             {seatRows.map((row) => <div className="seat-row" key={row[0]?.row}><span className="row-label">{row[0]?.row}</span><div className="seat-row-chairs">
               {row.map((seat, index) => <span className={index === 9 ? 'seat-aisle-wrap' : ''} key={seat.label}>
                 <button
-                  className={`seat ${seat.status === 'booked' ? 'seat-booked' : ''} ${seat.type === 'premium' ? 'seat-premium' : ''} ${selected.includes(seat.label) ? 'seat-selected' : ''}`}
+                  className={`seat ${seat.status !== 'available' ? 'seat-booked' : ''} ${seat.type === 'premium' ? 'seat-premium' : ''} ${selected.includes(seat.label) ? 'seat-selected' : ''}`}
                   disabled={seat.status !== 'available'}
-                  title={`${seat.label} · ${seat.type} · ${currency(seat.price)}${seat.status === 'booked' ? ' · Unavailable' : ''}`}
+                  title={`${seat.label} · ${seat.type} · ${currency(seat.price)}${seat.status !== 'available' ? ' · Unavailable' : ''}`}
                   aria-label={`Seat ${seat.label}, ${seat.status}, ${currency(seat.price)}`}
                   onClick={() => toggleSeat(seat)}
                 >{seat.number}</button>
@@ -382,7 +420,7 @@ function SeatPage() {
             </div><span className="row-label">{row[0]?.row}</span></div>)}
           </div>
           <div className="row-exit"><span>EXIT</span><i /><span>EXIT</span></div>
-          <p className="seat-hint">Seats are reserved when you confirm your demo booking. Maximum 10 seats per order.</p>
+          <p className="seat-hint">Seats are held for 10 minutes during Razorpay test checkout. Maximum 10 seats per order.</p>
         </section>
         <aside className="order-summary">
           <p className="eyebrow">YOUR EVENING</p>
@@ -392,29 +430,10 @@ function SeatPage() {
           <div className="summary-line"><span><MapPin size={14} /> {showtime.theater.name}</span></div>
           <div className="summary-seats"><span>YOUR SEATS</span><div>{selected.length ? selected.map((label) => <i key={label}>{label}</i>) : <small>No seats selected yet</small>}</div></div>
           <div className="summary-total"><span>{selected.length} {selected.length === 1 ? 'ticket' : 'tickets'}</span><strong>{currency(total)}</strong></div>
-          <fieldset className="payment-methods">
-            <legend>Payment method</legend>
-            <div className="payment-method-grid">
-              {paymentMethods.map(({ value, label, detail, Icon }) => (
-                <label className={`payment-option ${paymentMethod === value ? 'payment-option-selected' : ''}`} key={value}>
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value={value}
-                    checked={paymentMethod === value}
-                    onChange={() => setPaymentMethod(value)}
-                  />
-                  <Icon size={17} aria-hidden="true" />
-                  <span><strong>{label}</strong><small>{detail}</small></span>
-                  <i aria-hidden="true" />
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="demo-payment"><ShieldCheck size={15} /><span><b>Demo checkout · {paymentMethodLabel(paymentMethod)}</b><br />This only simulates a payment. No money is collected and no payment details are needed.</span></div>
+          <div className="demo-payment"><ShieldCheck size={15} /><span><b>Razorpay test checkout</b><br />Test credentials only. No live funds are collected.</span></div>
           {error && <p className="form-error">{error}</p>}
-          <button className="button button-gold confirm-booking" disabled={submitting || selected.length === 0} onClick={bookSeats}>{submitting ? <><LoaderCircle className="spin" size={16} /> Processing...</> : <>Complete demo payment · {currency(total)} <ArrowRight size={16} /></>}</button>
-          <p className="summary-disclaimer">No real payment · your booking is confirmed instantly</p>
+          <button className="button button-gold confirm-booking" disabled={submitting || selected.length === 0} onClick={bookSeats}>{submitting ? <><LoaderCircle className="spin" size={16} /> Opening secure checkout...</> : <><CreditCard size={16} /> Pay with Razorpay · {currency(total)} <ArrowRight size={16} /></>}</button>
+          <p className="summary-disclaimer">Seats are held for 10 minutes while you complete test checkout.</p>
         </aside>
       </div>
     </main>
@@ -439,8 +458,60 @@ function TheatersPage() {
       <div className="theater-filter"><label><MapPin size={17} /><input aria-label="Filter theaters by city" placeholder="Filter by city" value={city} onChange={(event) => setCity(event.target.value)} />{city && <button className="icon-button" aria-label="Clear city filter" onClick={() => setCity('')}><X size={15} /></button>}</label><span>{theaters.length} CINEMAS</span></div>
       {loading ? <div className="loading-state"><LoaderCircle className="spin" /> Finding cinemas...</div>
         : error ? <div className="inline-error">{error}</div>
-          : theaters.length ? <div className="theater-grid">{theaters.map((theater, index) => <article className="theater-card" key={theater._id}><div className={`theater-card-art art-${index % 4}`}><Film size={26} /><span>LUmiÈRE · {theater.city}</span></div><div className="theater-card-body"><h2>{theater.name}</h2><p><MapPin size={14} /> {theater.address}</p><div className="facility-list">{(theater.facilities || []).slice(0, 3).map((item) => <span key={item}>{item}</span>)}</div><div className="theater-card-foot"><span><Armchair size={14} /> {theater.seatCount || 200} seats</span><Link to="/" className="text-link">See films <ArrowRight size={14} /></Link></div></div></article>)}</div>
+          : theaters.length ? <div className="theater-grid">{theaters.map((theater, index) => <article className="theater-card" key={theater._id}><div className={`theater-card-art art-${index % 4}`}><Film size={26} /><span>LUmiÈRE · {theater.city}</span></div><div className="theater-card-body"><h2>{theater.name}</h2><p><MapPin size={14} /> {theater.address}</p><div className="facility-list">{(theater.facilities || []).slice(0, 3).map((item) => <span key={item}>{item}</span>)}</div><div className="theater-card-foot"><span><Armchair size={14} /> {theater.seatCount || 200} seats</span><Link to={`/theaters/${theater._id}`} className="text-link">See films <ArrowRight size={14} /></Link></div></div></article>)}</div>
             : <div className="empty-state empty-large"><Film size={25} /><h3>No theatres found</h3><p>Try another city, or check back soon.</p></div>}
+    </main>
+  )
+}
+
+function TheaterShowsPage() {
+  const { theaterId } = useParams()
+  const { user } = useAuth()
+  const [theater, setTheater] = useState(null)
+  const [showtimes, setShowtimes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    api.get(`/theaters/${theaterId}/shows`)
+      .then(({ data }) => {
+        if (!active) return
+        setTheater(data.theater)
+        setShowtimes(data.showtimes || [])
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.response?.data?.message || 'Could not load this theatre’s schedule.')
+      })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [theaterId])
+
+  const running = showtimes.filter((show) => show.status === 'running')
+  const upcoming = showtimes.filter((show) => show.status === 'upcoming')
+  const showCard = (show, isRunning) => (
+    <article className="theater-show-card theater-detail-show" key={show._id}>
+      <div className="theater-show-info"><span className="theater-monogram">{show.movie.poster ? <img src={show.movie.poster} alt="" /> : <Film size={19} />}</span><div><h3>{show.movie.title}</h3><p><MapPin size={13} /> {theater.name} · {theater.city}</p></div></div>
+      <div className="theater-show-tags"><span>{isRunning ? 'NOW SHOWING' : show.format}</span><span><Armchair size={13} /> {show.availableSeats} seats</span></div>
+      <div className="show-time-price"><strong>{isRunning ? 'In progress' : displayTime(show.startsAt)}</strong><span>{isRunning ? `Started ${displayTime(show.startsAt)}` : `${displayDate(show.startsAt)} · from ${currency(show.basePrice)}`}</span></div>
+      {!isRunning && user?.role !== 'admin' && user?.role !== 'theaterOwner' && <Link className="button button-gold show-book-button" to={`/seats/${show._id}`}>Select seats <ArrowRight size={15} /></Link>}
+    </article>
+  )
+
+  return (
+    <main className="page-shell container">
+      <Link className="back-link" to="/theaters"><ChevronLeft size={16} /> All theatres</Link>
+      {loading ? <div className="loading-state"><LoaderCircle className="spin" /> Loading this theatre’s films...</div>
+        : error ? <div className="inline-error">{error}</div>
+          : <>
+            <div className="page-intro theater-detail-intro"><p className="eyebrow">ON THE BIG SCREEN</p><h1>{theater.name}</h1><p><MapPin size={14} /> {theater.address} · {theater.city}</p></div>
+            <section className="theater-schedule-section"><div className="section-heading"><div><p className="eyebrow">HAPPENING NOW</p><h2>Currently showing</h2></div><span className="section-count">{running.length} FILMS</span></div>
+              {running.length ? <div className="theater-list">{running.map((show) => showCard(show, true))}</div> : <div className="empty-state"><Film size={21} /><p>No movies are currently in progress.</p></div>}
+            </section>
+            <section className="theater-schedule-section"><div className="section-heading"><div><p className="eyebrow">COMING UP</p><h2>Next showtimes</h2></div><span className="section-count">{upcoming.length} SHOWS</span></div>
+              {upcoming.length ? <div className="theater-list">{upcoming.map((show) => showCard(show, false))}</div> : <div className="empty-state"><CalendarDays size={21} /><p>No upcoming showtimes are listed for this theatre.</p></div>}
+            </section>
+          </>}
     </main>
   )
 }
@@ -451,6 +522,8 @@ function AuthPage() {
   const location = useLocation()
   const [mode, setMode] = useState(() => location.state?.mode === 'forgot' ? 'forgot' : 'login')
   const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [roleChoice, setRoleChoice] = useState('user')
+  const [adminRegistrationCode, setAdminRegistrationCode] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
@@ -466,8 +539,8 @@ function AuthPage() {
         setNotice(data.message)
       } else {
         const account = mode === 'login'
-          ? await login(form.email, form.password)
-          : await register(form.name, form.email, form.password)
+          ? await login(form.email, form.password, roleChoice)
+          : await register(form.name, form.email, form.password, roleChoice, adminRegistrationCode)
         navigate(location.state?.returnTo || (account.role === 'admin' || account.role === 'theaterOwner' ? '/manage' : '/bookings'))
       }
     } catch (requestError) {
@@ -486,9 +559,11 @@ function AuthPage() {
       <section className="auth-art"><div className="auth-art-content"><span className="auth-art-icon"><Film size={24} /></span><p className="eyebrow">LIGHTS DOWN. WORLD OFF.</p><h1>Every seat<br />has a <em>story.</em></h1><p>Find your film. Bring your people. We’ll save you a seat.</p><div className="auth-art-bottom"><span><Star size={13} fill="currentColor" /> A little more cinema, a little less ordinary.</span></div></div></section>
       <section className="auth-form-wrap">
         <div className="auth-form-card"><Link className="back-link" to="/"><ChevronLeft size={15} /> Back to exploring</Link><p className="eyebrow">{mode === 'login' ? 'GOOD TO SEE YOU AGAIN' : mode === 'register' ? 'YOUR NEXT CHAPTER' : 'ACCOUNT RECOVERY'}</p><h2>{mode === 'login' ? 'Welcome back.' : mode === 'register' ? 'Join the club.' : 'Forgot your password?'}</h2><p className="auth-subtitle">{mode === 'login' ? 'Your next movie night is just around the corner.' : mode === 'register' ? 'Create an account and let the good stories find you.' : 'Enter your account email and we’ll send a secure reset link if it matches an account.'}</p>
-          {mode === 'login' && <p className="auth-role-note"><KeyRound size={14} /> Admins and theatre owners use this same sign-in. Your account role opens the manager dashboard.</p>}
+          {mode === 'login' && <p className="auth-role-note"><KeyRound size={14} /> Choose the account type assigned to your email. Manager accounts open the studio desk.</p>}
           <form onSubmit={submit}>
+            {mode !== 'forgot' && <fieldset className="account-role-picker"><legend>Account type</legend><div>{[['user', 'User'], ['theaterOwner', 'Theatre owner'], ['admin', 'Admin']].map(([value, label]) => <label className={roleChoice === value ? 'account-role-selected' : ''} key={value}><input type="radio" name="accountRole" value={value} checked={roleChoice === value} onChange={() => setRoleChoice(value)} /><span>{label}</span></label>)}</div></fieldset>}
             {mode === 'register' && <label className="form-label">Your name<input required autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="First and last name" /></label>}
+            {mode === 'register' && roleChoice === 'admin' && <label className="form-label">Admin invitation code<input required autoComplete="off" value={adminRegistrationCode} onChange={(event) => setAdminRegistrationCode(event.target.value)} /></label>}
             <label className="form-label">{mode === 'forgot' ? 'Account email address' : 'Email address'}<input required type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label>
             {mode !== 'forgot' && <label className="form-label">Password<input required minLength={mode === 'register' ? 8 : 1} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={mode === 'register' ? 'At least 8 characters' : 'Your password'} /></label>}
             {error && <p className="form-error">{error}</p>}
@@ -566,7 +641,7 @@ function BookingHistory() {
   const [cancelling, setCancelling] = useState('')
 
   useEffect(() => {
-    if (!user) return
+    if (!user || user.role === 'admin' || user.role === 'theaterOwner') return
     api.get('/bookings/mine')
       .then(({ data }) => setTransactions(data.transactions || []))
       .catch((requestError) => setError(requestError.response?.data?.message || 'Could not load your tickets.'))
@@ -588,6 +663,7 @@ function BookingHistory() {
   }
 
   if (!user) return <Navigate to="/login" replace />
+  if (user.role === 'admin' || user.role === 'theaterOwner') return <Navigate to="/manage" replace />
   return (
     <main className="page-shell container">
       <div className="page-intro booking-intro"><p className="eyebrow">YOUR LITTLE STACK OF MEMORIES</p><h1>My <em>tickets.</em></h1><p>Every great movie night, all in one place.</p><span className="welcome-chip">Good to have you, {user.name.split(' ')[0]} <Sparkles size={14} /></span></div>
@@ -599,7 +675,7 @@ function BookingHistory() {
           <p>{emailSent
             ? <>We sent your ticket confirmation to <strong>{user.email}</strong>. Your booking is ready below, too.</>
             : <>Your booking is confirmed, but we couldn’t send the email. Your tickets are saved below.</>}</p>
-          <span className="confirmation-code">DEMO PAYMENT · {paymentMethodLabel(newBooking.paymentMethod)}{newBooking.bookingCode && <> · BOOKING CODE <strong>{newBooking.bookingCode}</strong></>}</span>
+          <span className="confirmation-code">TEST PAYMENT · {paymentMethodLabel(newBooking.paymentMethod)}{newBooking.bookingCode && <> · BOOKING CODE <strong>{newBooking.bookingCode}</strong></>}</span>
         </div>
         <a className="button button-quiet confirmation-action" href="#your-tickets">View your tickets <ArrowRight size={15} /></a>
       </section>}
@@ -610,7 +686,7 @@ function BookingHistory() {
           <div className="booking-poster">{booking.movie?.poster && <img src={booking.movie.poster} alt="" />}</div>
           <div className="booking-info"><div className="booking-status">{booking.status === 'confirmed' ? <><span className="status-dot" /> CONFIRMED</> : <><span className="status-dot cancelled-dot" /> CANCELLED</>}</div><h2>{booking.movie?.title || 'Movie ticket'}</h2><p><MapPin size={14} /> {booking.theater?.name} · {booking.theater?.city}</p><p><CalendarDays size={14} /> {booking.showtime?.startsAt ? `${displayDate(booking.showtime.startsAt)} · ${displayTime(booking.showtime.startsAt)}` : 'Showtime details unavailable'}</p></div>
           <div className="booking-ticket-detail"><span>SEATS</span><strong>{booking.seats.join(' · ')}</strong><span className="booking-code">{booking.bookingCode}</span></div>
-          <div className="booking-price"><strong>{currency(booking.amount)}</strong><span>DEMO · {paymentMethodLabel(booking.paymentMethod)}</span><button className="ticket-print" onClick={() => window.print()}><Printer size={14} /> Print ticket</button>{booking.status === 'confirmed' && <button className="cancel-ticket" disabled={cancelling === booking._id} onClick={() => cancel(booking._id)}>{cancelling === booking._id ? 'Cancelling...' : 'Cancel booking'}</button>}</div>
+          <div className="booking-price"><strong>{currency(booking.amount)}</strong><span>PAYMENT · {paymentMethodLabel(booking.paymentMethod)}</span><button className="ticket-print" onClick={() => window.print()}><Printer size={14} /> Print ticket</button>{booking.status === 'confirmed' && <button className="cancel-ticket" disabled={cancelling === booking._id} onClick={() => cancel(booking._id)}>{cancelling === booking._id ? 'Cancelling...' : 'Cancel booking'}</button>}</div>
         </article>)}</div>
           : <div className="empty-state empty-large"><TicketCheck size={28} /><h3>No tickets just yet</h3><p>Your next favourite film is waiting to be discovered.</p><Link className="button button-gold" to="/">Explore films <ArrowRight size={15} /></Link></div>}
     </main>
@@ -621,9 +697,11 @@ function ManagementPage() {
   const { user } = useAuth()
   const [movies, setMovies] = useState([])
   const [theaters, setTheaters] = useState([])
+  const [pendingTheaters, setPendingTheaters] = useState([])
   const [showtimes, setShowtimes] = useState([])
   const [analytics, setAnalytics] = useState(null)
   const [form, setForm] = useState({ movieId: '', theaterId: '', startsAt: '', basePrice: '250', format: '2D' })
+  const [theaterForm, setTheaterForm] = useState({ name: '', city: '', address: '', seatCount: '200' })
   const [editingShowtime, setEditingShowtime] = useState('')
   const [omdbQuery, setOmdbQuery] = useState('')
   const [omdbResults, setOmdbResults] = useState([])
@@ -633,15 +711,18 @@ function ManagementPage() {
   const [today] = useState(() => dateInputValue(new Date()))
 
   const refresh = async () => {
-    const [movieResult, theaterResult, showResult, analyticsResult] = await Promise.all([
+    const [movieResult, theaterResult, showResult, analyticsResult, pendingResult] = await Promise.all([
       api.get('/movies'),
       api.get('/theaters/mine'),
       api.get('/theaters/showtimes'),
       api.get('/analytics'),
+      user.role === 'admin' ? api.get('/theaters/pending') : Promise.resolve({ data: { theaters: [] } }),
     ])
-    const theaterIds = new Set(theaterResult.data.theaters.map((theater) => theater._id))
+    const listedTheaters = theaterResult.data.theaters || []
+    const theaterIds = new Set(listedTheaters.map((theater) => theater._id))
     setMovies(movieResult.data.movies || [])
-    setTheaters(theaterResult.data.theaters || [])
+    setTheaters(listedTheaters)
+    setPendingTheaters(pendingResult.data.theaters || [])
     setShowtimes((showResult.data.showtimes || []).filter((show) => (
       user.role === 'admin' || theaterIds.has(show.theater?._id)
     )))
@@ -649,7 +730,9 @@ function ManagementPage() {
     setForm((current) => ({
       ...current,
       movieId: current.movieId || movieResult.data.movies?.[0]?._id || '',
-      theaterId: current.theaterId || theaterResult.data.theaters?.[0]?._id || '',
+      theaterId: (listedTheaters.some((theater) => theater._id === current.theaterId && isApprovedTheater(theater))
+        ? current.theaterId
+        : listedTheaters.find(isApprovedTheater)?._id) || '',
     }))
   }
 
@@ -661,11 +744,14 @@ function ManagementPage() {
         api.get('/theaters/mine'),
         api.get('/theaters/showtimes'),
         api.get('/analytics'),
-      ]).then(([movieResult, theaterResult, showResult, analyticsResult]) => {
+        user.role === 'admin' ? api.get('/theaters/pending') : Promise.resolve({ data: { theaters: [] } }),
+      ]).then(([movieResult, theaterResult, showResult, analyticsResult, pendingResult]) => {
         if (!active) return
-        const theaterIds = new Set(theaterResult.data.theaters.map((theater) => theater._id))
+        const listedTheaters = theaterResult.data.theaters || []
+        const theaterIds = new Set(listedTheaters.map((theater) => theater._id))
         setMovies(movieResult.data.movies || [])
-        setTheaters(theaterResult.data.theaters || [])
+        setTheaters(listedTheaters)
+        setPendingTheaters(pendingResult.data.theaters || [])
         setShowtimes((showResult.data.showtimes || []).filter((show) => (
           user.role === 'admin' || theaterIds.has(show.theater?._id)
         )))
@@ -673,7 +759,9 @@ function ManagementPage() {
         setForm((current) => ({
           ...current,
           movieId: current.movieId || movieResult.data.movies?.[0]?._id || '',
-          theaterId: current.theaterId || theaterResult.data.theaters?.[0]?._id || '',
+          theaterId: (listedTheaters.some((theater) => theater._id === current.theaterId && isApprovedTheater(theater))
+            ? current.theaterId
+            : listedTheaters.find(isApprovedTheater)?._id) || '',
         }))
       }).catch((requestError) => {
         if (active) setError(requestError.response?.data?.message || 'Could not load management data.')
@@ -706,6 +794,35 @@ function ManagementPage() {
       setError(requestError.response?.data?.message || 'Could not create the showtime.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const createTheater = async (event) => {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    setSuccess('')
+    try {
+      const { data } = await api.post('/theaters', { ...theaterForm, seatCount: Number(theaterForm.seatCount) })
+      setSuccess(data.message)
+      setTheaterForm({ name: '', city: '', address: '', seatCount: '200' })
+      await refresh()
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Could not submit the theatre request.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const reviewTheater = async (id, approvalStatus) => {
+    setError('')
+    setSuccess('')
+    try {
+      const { data } = await api.patch(`/theaters/${id}/approval`, { approvalStatus })
+      setSuccess(data.message)
+      await refresh()
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Could not review this theatre request.')
     }
   }
 
@@ -761,6 +878,7 @@ function ManagementPage() {
 
   if (!user) return <Navigate to="/login" replace />
   if (!['admin', 'theaterOwner'].includes(user.role)) return <main className="page-shell container"><div className="inline-error">This page is for cinema managers.</div></main>
+  const approvedTheaters = theaters.filter(isApprovedTheater)
 
   return (
     <main className="page-shell container manage-page">
@@ -768,19 +886,32 @@ function ManagementPage() {
       {error && <div className="inline-error">{error}</div>}
       {success && <div className="inline-success"><Check size={16} />{success}<button className="icon-button" onClick={() => setSuccess('')} aria-label="Dismiss"><X size={15} /></button></div>}
       {analytics && <section className="analytics-grid">
-        <article><span>DEMO REVENUE</span><strong>{currency(analytics.revenue)}</strong><small>Confirmed transactions</small></article>
+        <article><span>TEST REVENUE</span><strong>{currency(analytics.revenue)}</strong><small>Confirmed Razorpay test payments</small></article>
         <article><span>TICKETS SOLD</span><strong>{analytics.tickets}</strong><small>{analytics.bookings} confirmed bookings</small></article>
         <article><span>SEAT OCCUPANCY</span><strong>{analytics.occupancyRate}%</strong><small>Upcoming scheduled shows</small></article>
         <article className="analytics-icon"><BarChart3 size={24} /><span>YOUR CINEMA<br />AT A GLANCE</span></article>
       </section>}
+      {user.role === 'admin' && <section className="schedule-panel theater-approval-panel"><div className="section-heading"><div><p className="eyebrow">OWNER APPLICATIONS</p><h2>Theatre approval requests</h2></div><span className="section-count">{pendingTheaters.length} PENDING</span></div>
+        {pendingTheaters.length ? <div className="schedule-list">{pendingTheaters.map((theater) => <article className="schedule-row theater-request-row" key={theater._id}><div className="schedule-film"><strong>{theater.name}</strong><span>{theater.city} · {theater.address}</span></div><div className="schedule-film"><strong>{theater.owner?.name || 'Theatre owner'}</strong><span>{theater.owner?.email}</span></div><span>{theater.seatCount} seats</span><div className="schedule-actions"><button className="edit-ticket" onClick={() => reviewTheater(theater._id, 'approved')}>Approve</button><button className="cancel-ticket" onClick={() => reviewTheater(theater._id, 'rejected')}>Reject</button></div></article>)}</div> : <p className="manage-hint">No theatre requests are waiting for review.</p>}
+      </section>}
       <div className="manage-columns">
+        {user.role === 'theaterOwner' && <section className="manage-panel"><div className="panel-title"><span className="panel-icon"><Film size={18} /></span><div><p className="eyebrow">GROW YOUR CINEMA</p><h2>Request a theatre</h2></div></div>
+          <form className="manage-form" onSubmit={createTheater}>
+            <label className="form-label">Theatre name<input required maxLength={120} value={theaterForm.name} onChange={(event) => setTheaterForm({ ...theaterForm, name: event.target.value })} /></label>
+            <label className="form-label">City<input required maxLength={100} value={theaterForm.city} onChange={(event) => setTheaterForm({ ...theaterForm, city: event.target.value })} /></label>
+            <label className="form-label">Street address<input required maxLength={240} value={theaterForm.address} onChange={(event) => setTheaterForm({ ...theaterForm, address: event.target.value })} /></label>
+            <label className="form-label">Seat count<input required type="number" min="1" max="2000" value={theaterForm.seatCount} onChange={(event) => setTheaterForm({ ...theaterForm, seatCount: event.target.value })} /></label>
+            <button className="button button-gold auth-submit" disabled={loading}>{loading ? 'Submitting...' : <>Submit for approval <ArrowRight size={16} /></>}</button>
+          </form>
+          {theaters.length > 0 && <div className="owner-theater-status">{theaters.map((theater) => <div key={theater._id}><strong>{theater.name}</strong><span className={`approval-status status-${theater.approvalStatus || 'approved'}`}>{theater.approvalStatus || 'approved'}</span></div>)}</div>}
+        </section>}
         <section className="manage-panel"><div className="panel-title"><span className="panel-icon"><CalendarDays size={18} /></span><div><p className="eyebrow">KEEP THE LIGHTS ON</p><h2>Add a showtime</h2></div></div>
           <form className="manage-form" onSubmit={createShow}>
             <label className="form-label">Film<select required disabled={Boolean(editingShowtime)} value={form.movieId} onChange={(event) => setForm({ ...form, movieId: event.target.value })}>{movies.map((movie) => <option key={movie._id} value={movie._id}>{movie.title}</option>)}</select></label>
-            <label className="form-label">Theatre<select required disabled={Boolean(editingShowtime)} value={form.theaterId} onChange={(event) => setForm({ ...form, theaterId: event.target.value })}>{theaters.map((theater) => <option key={theater._id} value={theater._id}>{theater.name} · {theater.city}</option>)}</select></label>
+            <label className="form-label">Theatre<select required disabled={Boolean(editingShowtime)} value={form.theaterId} onChange={(event) => setForm({ ...form, theaterId: event.target.value })}>{approvedTheaters.map((theater) => <option key={theater._id} value={theater._id}>{theater.name} · {theater.city}</option>)}</select></label>
             <div className="manage-form-row"><label className="form-label">Date & time<input required type="datetime-local" min={`${today}T00:00`} value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} /></label><label className="form-label">Base price (₹)<input required type="number" min="1" value={form.basePrice} onChange={(event) => setForm({ ...form, basePrice: event.target.value })} /></label></div>
             <label className="form-label">Format<select value={form.format} onChange={(event) => setForm({ ...form, format: event.target.value })}><option>2D</option><option>3D</option><option>IMAX</option><option>Dolby Atmos</option></select></label>
-            <button className="button button-gold auth-submit" disabled={loading || !movies.length || !theaters.length}>{loading ? 'Saving...' : <>{editingShowtime ? <Check size={16} /> : <Plus size={16} />} {editingShowtime ? 'Save showtime changes' : 'Add to schedule'}</>}</button>
+            <button className="button button-gold auth-submit" disabled={loading || !movies.length || !approvedTheaters.length}>{loading ? 'Saving...' : <>{editingShowtime ? <Check size={16} /> : <Plus size={16} />} {editingShowtime ? 'Save showtime changes' : 'Add to schedule'}</>}</button>
             {editingShowtime && <button className="button button-quiet auth-submit" type="button" onClick={cancelEdit}>Cancel editing</button>}
           </form>
         </section>
@@ -803,7 +934,7 @@ function ManagementPage() {
           return <article className="schedule-row" key={show._id}><div className="schedule-date">{displayDate(show.startsAt)}<strong>{displayTime(show.startsAt)}</strong></div><div className="schedule-film"><strong>{show.movie?.title}</strong><span>{show.theater?.name} · {show.theater?.city}</span></div><span className="format-pill">{show.format}</span><span className="schedule-price">{currency(show.basePrice)}</span><div className="schedule-actions"><button className="edit-ticket" disabled={hasBookings} onClick={() => editShow(show)}>Edit</button><button className="cancel-ticket" disabled={hasBookings} onClick={() => deactivateShow(show._id)}>Remove</button></div></article>
         })}</div> : <p className="manage-hint">No upcoming showtimes scheduled.</p>}
       </section>
-      <p className="demo-note">Bookings are demo transactions; no real money is collected or refunded.</p>
+      <p className="demo-note">Ticket payments and cancellations use Razorpay test mode; no live funds are collected.</p>
     </main>
   )
 }
@@ -821,6 +952,7 @@ function App() {
         <Route path="/showtimes/:movieId" element={<ShowtimesPage />} />
         <Route path="/seats/:showtimeId" element={<SeatPage />} />
         <Route path="/theaters" element={<TheatersPage />} />
+        <Route path="/theaters/:theaterId" element={<TheaterShowsPage />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/forgot-password" element={<Navigate to="/login" replace state={{ mode: 'forgot' }} />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
