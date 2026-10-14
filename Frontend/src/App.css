@@ -338,6 +338,9 @@
 .inline-error, .inline-success { display: flex; align-items: center; gap: 8px; margin: 15px 0; padding: 11px 13px; border: 1px solid rgba(207,135,118,.27); color: #dfaa9e; background: rgba(166,92,77,.08); font-size: 10px; line-height: 1.5; }
 .inline-success { justify-content: flex-start; border-color: rgba(145,177,139,.25); color: #b5c9ad; background: rgba(114,148,107,.08); }
 .inline-success .icon-button { margin-left: auto; }
+.page-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; min-height: clamp(230px, 42vh, 360px); color: #a8a296; font-size: 10px; }
+.page-loader-mark { display: grid; place-items: center; width: 39px; height: 39px; margin-bottom: 2px; border: 1px solid rgba(214,184,121,.32); color: var(--gold); background: #191a17; }
+.page-loader-spinner { display: flex; align-items: center; justify-content: center; }
 .loading-state { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 230px; color: #a8a296; font-size: 11px; }
 .loading-state svg { color: var(--gold); }
 .spin { animation: spin 1s linear infinite; }
